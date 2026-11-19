@@ -1,9 +1,21 @@
+
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables before importing routes and services
+ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(ENV_PATH)
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.init_db import initialize_database
 from app.routes.book_routes import router as book_router
 from app.routes.dashboard_routes import router as dashboard_router
+from app.routes.staff_routes import router as staff_router
+from app.routes.auth_routes import router as auth_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -23,6 +35,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -34,7 +47,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# Register API routes
 app.include_router(book_router)
+app.include_router(staff_router)
+app.include_router(auth_router)
+app.include_router(dashboard_router)
+
 
 @app.get("/")
 def home():
@@ -42,8 +61,6 @@ def home():
         "message": "Library Management System API is running!",
         "status": "success"
     }
-
-app.include_router(dashboard_router)
 
 
 @app.get("/health")

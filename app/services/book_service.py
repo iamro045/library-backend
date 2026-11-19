@@ -19,24 +19,34 @@ INVENTORY_FILTER = {
 }
 
 
+
 def create_book(book: BookCreate):
+    book_data = book.model_dump()
+
+    book_data["book_id"] = book_data["book_id"].strip()
+    book_data["barcode"] = book_data["barcode"].strip()
+    book_data["title"] = book_data["title"].strip()
+    book_data["author"] = book_data["author"].strip()
+
+    book_data["status"] = "available"
+    book_data["is_active"] = True
+    book_data["created_at"] = datetime.now(timezone.utc)
+
     try:
-        book_data = book.model_dump()
-
-        book_data["status"] = "available"
-        book_data["is_active"] = True
-        book_data["created_at"] = datetime.now(timezone.utc)
-
-        result = books_collection.insert_one(book_data)
+        books_collection.insert_one(book_data)
 
         return {
             "message": "Book added successfully",
-            "book_id": book_data["book_id"],
-            "database_id": str(result.inserted_id)
+            "book_id": book_data["book_id"]
         }
 
-    except DuplicateKeyError:
-        raise ValueError("Book ID or barcode already exists")
+    except DuplicateKeyError as e:
+        print("Duplicate key details:", e.details)
+
+        raise ValueError(
+            "Book ID, ISBN or barcode already exists. Please use unique values."
+        )
+
 
 
 def get_all_books():
@@ -51,10 +61,9 @@ def get_all_books():
 
 
 def get_book_by_id(book_id: str):
-
     book = books_collection.find_one({
         "book_id": book_id.strip(),
-        **INVENTORY_FILTER
+        "is_active": {"$ne": False}
     })
 
     if book:
@@ -76,6 +85,8 @@ def get_book_by_barcode(barcode: str):
 
 
 
+
+
 def update_book(book_id: str, book_update: BookUpdate):
     book_id = book_id.strip()
 
@@ -88,7 +99,7 @@ def update_book(book_id: str, book_update: BookUpdate):
         result = books_collection.update_one(
             {
                 "book_id": book_id,
-                **INVENTORY_FILTER
+                "is_active": {"$ne": False}
             },
             {
                 "$set": {
@@ -106,8 +117,11 @@ def update_book(book_id: str, book_update: BookUpdate):
             "book_id": book_id
         }
 
-    except DuplicateKeyError:
-        raise ValueError("Book ID or barcode already exists")
+    except DuplicateKeyError as e:
+        print("Duplicate key details:", e.details)
+        raise ValueError(
+            "Book ID, ISBN or barcode already exists on another record."
+        )
 
 
 def delete_book(book_id: str):
@@ -115,7 +129,7 @@ def delete_book(book_id: str):
 
     book = books_collection.find_one({
         "book_id": book_id,
-        **INVENTORY_FILTER
+        "is_active": {"$ne": False}
     })
 
     if not book:
@@ -140,7 +154,6 @@ def delete_book(book_id: str):
         "message": "Book removed from inventory successfully",
         "book_id": book_id
     }
-
 
 def get_inventory_stats():
     return {

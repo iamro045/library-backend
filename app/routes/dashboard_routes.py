@@ -1,30 +1,37 @@
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
 from app.models.collections import (
     books_collection,
     members_collection
 )
 
-router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
+from app.services.auth_dependencies import require_librarian_or_admin
+
+
+router = APIRouter(
+    prefix="/dashboard",
+    tags=["Dashboard"]
+)
 
 
 @router.get("/stats")
-def get_dashboard_stats():
+def get_dashboard_stats(
+    current_staff=Depends(require_librarian_or_admin)
+):
 
-    # Exclude test records from actual library inventory
     inventory_filter = {
         "book_id": {
             "$exists": True,
             "$nin": [None, "TEST001"]
-        }
+        },
+        "is_active": {"$ne": False}
     }
 
-    # Total physical books
     total_books = books_collection.count_documents(
         inventory_filter
     )
 
-    # Books by availability status
     available_books = books_collection.count_documents({
         **inventory_filter,
         "status": "available"
@@ -35,7 +42,6 @@ def get_dashboard_stats():
         "status": "issued"
     })
 
-    # Registered library members
     total_members = members_collection.count_documents({})
 
     return {
